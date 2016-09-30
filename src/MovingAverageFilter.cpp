@@ -1,8 +1,8 @@
-#include "SMAFilter.h"
+#include "MovingAverageFilter.h"
 #include <stdlib.h>
 #include <string.h>
 
-SMAFilter::SMAFilter(int length) {
+MovingAverageFilter::MovingAverageFilter(int length) {
 	this->length = length;
 	this->pos = 0;
 	this->sum = 0;
@@ -10,12 +10,16 @@ SMAFilter::SMAFilter(int length) {
 	memset(this->history, 0, sizeof(int)*length);
 }
 
-int SMAFilter::process(int value) {
+//MovingAverageFilter::~MovingAverageFilter() {
+//    if (this->history != NULL) free(this->history);
+//}
+
+int MovingAverageFilter::process(int value) {
 	this->history[this->pos] = value;
 	this->sum += value;
-	
+
 	this->pos = (this->pos + 1) % this->length;
 	this->sum -= this->history[this->pos];
-	
+
 	return this->sum/(this->length-1);
 }
