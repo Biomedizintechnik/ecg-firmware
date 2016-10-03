@@ -166,6 +166,8 @@ void Bluetooth::send_state() {
     uint16_t spo2Value = state->spo2Value;
     uint16_t heartRateUpdated = state->heartRateUpdated;
     if (heartRateUpdated) state->heartRateUpdated = false;
+    uint16_t spo2ValueUpdated = state->spo2ValueUpdated;
+    if (spo2ValueUpdated) state->spo2ValueUpdated = false;
     taskEXIT_CRITICAL();
 
     send_14bit_value(ecgCurve);
@@ -175,5 +177,7 @@ void Bluetooth::send_state() {
         send_typed_10bit_value(0b000, heartRate);
     }
 
-    //send_typed_10bit_value(0b001, spo2Value);
+    if (spo2ValueUpdated) {
+        send_typed_10bit_value(0b001, spo2Value);
+    }
 }

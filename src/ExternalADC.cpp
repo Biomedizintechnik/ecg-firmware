@@ -23,7 +23,7 @@ uint16_t ExternalADC::read() {
 
     TWI_MasterWrite(&twi, ADC_ADDR, cmd1, 3);
 
-    vTaskDelay(8 / portTICK_PERIOD_MS);
+    vTaskDelay(2 / portTICK_PERIOD_MS);
 
     while (twi.status != TWIM_STATUS_READY) {}
 
