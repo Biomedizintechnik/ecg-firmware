@@ -3,6 +3,9 @@
 #include "twi_master_driver.h"
 #include "ExternalADC.h"
 
+#include "FreeRTOS.h"
+#include "task.h"
+
 #define ADC_ADDR 0b1001000
 #define F_TWI 400000
 
@@ -16,20 +19,16 @@ void ExternalADC::init() {
 }
 
 uint16_t ExternalADC::read() {
-    uint8_t cmd1[] = {0b01, 0b01000001, 0b11100011};
+    uint8_t cmd1[] = {0b01, 0b11000001, 0b11100011};
 
     TWI_MasterWrite(&twi, ADC_ADDR, cmd1, 3);
 
-    while (twi.status != TWIM_STATUS_READY) {}
+    vTaskDelay(8 / portTICK_PERIOD_MS);
 
-    _delay_ms(8);
+    while (twi.status != TWIM_STATUS_READY) {}
 
     uint8_t cmd2[] = {0b00};
-    TWI_MasterWrite(&twi, ADC_ADDR, cmd2, 1);
-
-    while (twi.status != TWIM_STATUS_READY) {}
-
-    TWI_MasterRead(&twi, ADC_ADDR, 2);
+    TWI_MasterWriteRead(&twi, ADC_ADDR, cmd2, 1, 2);
 
     while (twi.status != TWIM_STATUS_READY) {}
 

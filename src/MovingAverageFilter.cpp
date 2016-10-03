@@ -1,20 +1,17 @@
 #include "MovingAverageFilter.h"
+#include "FreeRTOS.h"
 #include <stdlib.h>
 #include <string.h>
 
-MovingAverageFilter::MovingAverageFilter(int length) {
+MovingAverageFilter::MovingAverageFilter(uint16_t length) {
 	this->length = length;
 	this->pos = 0;
 	this->sum = 0;
-	this->history = (int*)malloc(sizeof(int)*length);
-	memset(this->history, 0, sizeof(int)*length);
+	this->history = (uint16_t*)pvPortMalloc(sizeof(uint16_t)*length);
+	memset(this->history, 0, sizeof(uint16_t)*length);
 }
 
-//MovingAverageFilter::~MovingAverageFilter() {
-//    if (this->history != NULL) free(this->history);
-//}
-
-int MovingAverageFilter::process(int value) {
+uint16_t MovingAverageFilter::process(uint16_t value) {
 	this->history[this->pos] = value;
 	this->sum += value;
 

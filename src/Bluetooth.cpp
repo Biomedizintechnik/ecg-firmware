@@ -2,6 +2,10 @@
 #include <util/delay.h>
 #include <stdlib.h>
 #include "Bluetooth.h"
+#include "State.h"
+
+#include "FreeRTOS.h"
+#include "task.h"
 
 #define RESET_PIN PIN5_bm
 #define KEY_PIN PIN4_bm
@@ -106,6 +110,29 @@ void Bluetooth::init() {
     PORTD.OUTCLR = KEY_PIN;
 }
 
+/* ECG/SpO2 Serial Protocol
+ * 0b10101010: Frame Start
+ * 0b0XXXXXXX: ECG Graph Value (7 most significant bits)
+ * 0b0XXXXXXX: ECG Graph Value (7 least significant bits)
+ * 0b0XXXXXXX: SpO2 Graph Value (7 most significant bits)
+ * 0b0XXXXXXX: SpO2 Graph Value (7 least significant bits)
+ * ---- One or more optional Fields ----
+ * 0b11TTTXXX: Type (3 bits) + Value (3 most significant bits)
+ * 0b0XXXXXXX: Value (7 least significant bits)
+ * Types:
+ * 000: Heart rate
+ * 001: SpO2 value
+ * [...] Unused
+ * 111: Battery voltage
+ */
+
+void Bluetooth::run(void*) {
+    for (;;) {
+        vTaskDelay(8 / portTICK_PERIOD_MS);
+        send_state();
+    }
+}
+
 void Bluetooth::send_str(const char* text) {
     while (*text) {
         uart_send_char(*text++);
@@ -118,21 +145,35 @@ void Bluetooth::send_int(int num) {
     Bluetooth::send_str(buf);
 }
 
-void Bluetooth::send_frame(uint16_t frame) {
-    uart_send_byte((uint8_t)(frame >> 8));
-    uart_send_byte((uint8_t)frame);
+void Bluetooth::send_14bit_value(uint16_t value) {
+    uart_send_byte((value >> 7) & 0b01111111);
+    uart_send_byte(value & 0b01111111);
 }
 
-void Bluetooth::send_ecg(uint16_t value) {
-    uint16_t frame = 0b1000000000000000;
-    frame |= (value & 0b111110000000) << 1;
-    frame |= value & 0b1111111;
-    send_frame(frame);
+void Bluetooth::send_typed_10bit_value(uint8_t type, uint16_t value) {
+    uart_send_byte(0b11000000 | ((type & 0b111) << 3) | (value >> 7) & 0b111);
+    uart_send_byte(value & 0b01111111);
 }
 
-void Bluetooth::send_pulse(uint16_t value) {
-    uint16_t frame = 0b1010000000000000;
-    frame |= (value & 0b10000000) << 2;
-    frame |= value & 0b01111111;
-    send_frame(frame);
+void Bluetooth::send_state() {
+    uart_send_byte(0b10101010); // frame start
+
+    State* state = State::get();
+    taskENTER_CRITICAL();
+    uint16_t ecgCurve = state->ecgCurve;
+    uint16_t spo2Curve = state->spo2Curve;
+    uint16_t heartRate = state->heartRate;
+    uint16_t spo2Value = state->spo2Value;
+    uint16_t heartRateUpdated = state->heartRateUpdated;
+    if (heartRateUpdated) state->heartRateUpdated = false;
+    taskEXIT_CRITICAL();
+
+    send_14bit_value(ecgCurve);
+    send_14bit_value(spo2Curve);
+
+    if (heartRateUpdated) {
+        send_typed_10bit_value(0b000, heartRate);
+    }
+
+    //send_typed_10bit_value(0b001, spo2Value);
 }

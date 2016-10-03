@@ -4,14 +4,13 @@
 
 class MovingAverageFilter {
 public:
-    MovingAverageFilter(int length);
-    //~MovingAverageFilter();
+    MovingAverageFilter(uint16_t length);
 
-    int process(int value);
+    uint16_t process(uint16_t value);
 
 private:
-    int* history;
-    int length;
-    int pos;
-    int32_t sum;
+    uint16_t* history;
+    uint16_t length;
+    uint16_t pos;
+    uint32_t sum;
 };

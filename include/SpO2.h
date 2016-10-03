@@ -3,7 +3,7 @@
 class SpO2 {
 public:
     static void init();
-    static void run();
+    static void run(void*);
 
 private:
     static void set_red_led(bool level);
