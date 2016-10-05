@@ -37,6 +37,10 @@ void ECG::run(void*) {
 
         if (time_since_last_beat > 200) {
             if (value > (1.5f * avg)) {
+                if (time_since_last_beat > 5000) {
+                     time_since_last_beat = 800;
+                }
+
                 int avg_time = rateFilter.process(time_since_last_beat);
                 uint8_t pulse = 60000/avg_time;
 
@@ -47,6 +51,17 @@ void ECG::run(void*) {
 
                 set_pulse_led(true);
                 time_since_last_beat = 0;
+            }
+            else if (time_since_last_beat > 5000) {
+                if (time_since_last_beat < 10000) {
+                    taskENTER_CRITICAL();
+                    State::get()->heartRate = 0;
+                    State::get()->heartRateUpdated = true;
+                    taskEXIT_CRITICAL();
+                    time_since_last_beat = 10000;
+                }
+
+                set_pulse_led(true);
             }
             else {
                 set_pulse_led(false);
