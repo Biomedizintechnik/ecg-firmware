@@ -9,12 +9,15 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define MAX_PERIOD_SAMPLES 700
+#define MAX_PERIOD_SAMPLES 250
 
 static MovingAverageFilter curveFilter(10);
-static MovingAverageFilter redFilter(10);
-static MovingAverageFilter infraredFilter(10);
-static MovingAverageFilter dcFilter(MAX_PERIOD_SAMPLES);
+static MovingAverageFilter redFilter(5);
+static MovingAverageFilter infraredFilter(5);
+static MovingAverageFilter infraredDcFilter(MAX_PERIOD_SAMPLES);
+
+static MovingAverageFilter redAmplitudeFilter(7);
+static MovingAverageFilter infraredAmplitudeFilter(7);
 
 static MinMaxTracker redMinMax(MAX_PERIOD_SAMPLES);
 static MinMaxTracker infraredMinMax(MAX_PERIOD_SAMPLES);
@@ -43,30 +46,34 @@ void SpO2::run(void*) {
         vTaskDelay(2 / portTICK_PERIOD_MS);
 
         uint16_t infraredValue = ExternalADC::read();
-        infraredMinMax.process(redFilter.process(infraredValue));
+        uint16_t infraredDcValue = infraredDcFilter.process(infraredValue);
+        infraredMinMax.process(infraredFilter.process(infraredValue));
 
         if (redMinMax.getPos() == 0) {
-            float redMax = redMinMax.getMax();
-            float redMin = redMinMax.getMin();
-            float infraredMax = infraredMinMax.getMax();
-            float infraredMin = infraredMinMax.getMin();
+            uint16_t redMax = redMinMax.getMax();
+            uint16_t redMin = redMinMax.getMin();
+            uint16_t infraredMax = infraredMinMax.getMax();
+            uint16_t infraredMin = infraredMinMax.getMin();
 
-            int16_t SpO2 = 0;
-            if (redMin > 0 && infraredMin > 0) {
-                float R = (redMax/redMin)/(infraredMax/infraredMin);
-                SpO2 = R*100.0f; //253.0f-(166.0f*R);
+            uint16_t redAmplitude = redAmplitudeFilter.process(redMax-redMin);
+            uint16_t infraredAmplitude = infraredAmplitudeFilter.process(infraredMax-infraredMin);
+
+            uint16_t SpO2 = 0;
+            if (infraredAmplitude != 0) {
+                double R = (double)(redAmplitude)/(double)(infraredAmplitude);
+                SpO2 = (uint16_t)((43.96 * (R*R) - 106.9 * R + 147.9) + 0.5);
             }
 
-            if (SpO2 > 99) SpO2 = 99;
-            else if (SpO2 < 60) SpO2 = 60;
+            if (SpO2 > 100) SpO2 = 100;
+            else if (SpO2 < 80) SpO2 = 0;
 
             taskENTER_CRITICAL();
             State::get()->spo2Value = SpO2;
             State::get()->spo2ValueUpdated = true;
             taskEXIT_CRITICAL();
         }
-        uint16_t dcValue = dcFilter.process(infraredValue);
-        int16_t infraredAcValue = (int16_t)dcValue - (int16_t)infraredValue;
+
+        int16_t infraredAcValue = (int16_t)infraredDcValue - (int16_t)infraredValue;
         uint16_t curveValue = curveFilter.process((uint16_t)(infraredAcValue*16 + 2048));
         if (curveValue > 4095) curveValue = 4095;
         else if (curveValue < 0) curveValue = 0;
